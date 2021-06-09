@@ -10,9 +10,9 @@ import torch
 from PIL import Image
 
 from raft import RAFT
-from utils import flow_viz
+# from utils import flow_viz
 from utils.utils import InputPadder
-
+from utils.frame_utils import writeFlow
 
 
 DEVICE = 'cuda'
@@ -23,22 +23,6 @@ def load_image(imfile):
     return img[None].to(DEVICE)
 
 
-def viz(img, flo):
-    img = img[0].permute(1,2,0).cpu().numpy()
-    flo = flo[0].permute(1,2,0).cpu().numpy()
-    
-    # map flow to rgb image
-    flo = flow_viz.flow_to_image(flo)
-    img_flo = np.concatenate([img, flo], axis=0)
-
-    # import matplotlib.pyplot as plt
-    # plt.imshow(img_flo / 255.0)
-    # plt.show()
-
-    cv2.imshow('image', img_flo[:, :, [2,1,0]]/255.0)
-    cv2.waitKey()
-
-
 def demo(args):
     model = torch.nn.DataParallel(RAFT(args))
     model.load_state_dict(torch.load(args.model))
@@ -47,11 +31,13 @@ def demo(args):
     model.to(DEVICE)
     model.eval()
 
+    os.makedirs(os.path.join(args.path, 'flow_fw'), exist_ok=True)
+    os.makedirs(os.path.join(args.path, 'flow_bw'), exist_ok=True)
+    print('Predicting optical flow ...')
+
     with torch.no_grad():
-        images = glob.glob(os.path.join(args.path, '*.png')) + \
-                 glob.glob(os.path.join(args.path, '*.jpg'))
+        images = sorted(glob.glob(os.path.join(args.path, 'images/*')))
         
-        images = sorted(images)
         for imfile1, imfile2 in zip(images[:-1], images[1:]):
             image1 = load_image(imfile1)
             image2 = load_image(imfile2)
@@ -59,8 +45,11 @@ def demo(args):
             padder = InputPadder(image1.shape)
             image1, image2 = padder.pad(image1, image2)
 
-            flow_low, flow_up = model(image1, image2, iters=20, test_mode=True)
-            viz(image1, flow_up)
+            _, flow_fw = model(image1, image2, iters=20, test_mode=True)
+            _, flow_bw = model(image2, image1, iters=20, test_mode=True)
+
+            writeFlow(imfile1.replace('images', 'flow_fw')[:-3]+'flo', flow_fw[0].permute(1,2,0).cpu().numpy())
+            writeFlow(imfile1.replace('images', 'flow_bw')[:-3]+'flo', flow_bw[0].permute(1,2,0).cpu().numpy())
 
 
 if __name__ == '__main__':
