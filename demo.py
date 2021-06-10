@@ -49,7 +49,7 @@ def demo(args):
             _, flow_bw = model(image2, image1, iters=20, test_mode=True)
 
             writeFlow(imfile1.replace('images', 'flow_fw')[:-3]+'flo', flow_fw[0].permute(1,2,0).cpu().numpy())
-            writeFlow(imfile1.replace('images', 'flow_bw')[:-3]+'flo', flow_bw[0].permute(1,2,0).cpu().numpy())
+            writeFlow(imfile2.replace('images', 'flow_bw')[:-3]+'flo', flow_bw[0].permute(1,2,0).cpu().numpy())
 
 
 if __name__ == '__main__':
